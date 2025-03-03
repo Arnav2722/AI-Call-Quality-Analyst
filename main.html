@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Call Quality Analyst</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .drag-area {
+            border: 2px dashed #4a5568;
+            transition: all 0.3s ease;
+        }
+
+        .drag-area.active {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .analyzing {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">AI Call Quality Analyst</h1>
+            <p class="text-gray-600">Upload your call recording for instant AI analysis</p>
+        </header>
+
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
+            <!-- Upload Section -->
+            <div id="uploadSection" class="drag-area rounded-lg p-8 text-center cursor-pointer">
+                <i class="bi bi-cloud-upload text-4xl text-blue-500"></i>
+                <h3 class="text-lg font-semibold mt-4">Drag & Drop your audio file here</h3>
+                <p class="text-gray-500 mt-2">or</p>
+                <button class="bg-blue-500 text-white px-6 py-2 rounded-lg mt-4 hover:bg-blue-600 transition">
+                    Browse File
+                </button>
+                <input type="file" id="fileInput" class="hidden" accept="audio/*">
+                <p class="text-sm text-gray-500 mt-4">Supported formats: MP3, WAV, M4A (Max 50MB)</p>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progressSection" class="hidden mt-6">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="progress-bar bg-blue-500 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <p class="text-center text-sm text-gray-600 mt-2">Processing: <span id="progressText">0%</span></p>
+            </div>
+
+            <!-- Analysis Results -->
+            <div id="resultsSection" class="hidden mt-8">
+                <h3 class="text-xl font-bold mb-4">Analysis Report</h3>
+
+                <!-- Overall Score -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-lg font-semibold">Overall Quality Score</span>
+                        <span id="overallScore" class="text-2xl font-bold text-blue-600">0%</span>
+                    </div>
+                </div>
+
+                <!-- Detailed Metrics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Voice Clarity</h4>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="clarityScore" class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Background Noise</h4>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="noiseScore" class="bg-yellow-500 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Analysis -->
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h4 class="font-semibold mb-3">Detailed Analysis</h4>
+                    <ul id="analysisPoints" class="space-y-2 text-gray-700">
+                        <!-- Analysis points will be inserted here -->
+                    </ul>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-center mt-6 space-x-4">
+                    <button onclick="downloadReport()"
+                        class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition">
+                        <i class="bi bi-download mr-2"></i>Download Report
+                    </button>
+                    <button onclick="resetAnalysis()"
+                        class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition">
+                        <i class="bi bi-arrow-counterclockwise mr-2"></i>New Analysis
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadSection = document.getElementById('uploadSection');
+        const progressSection = document.getElementById('progressSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const fileInput = document.getElementById('fileInput');
+        const progressBar = document.querySelector('.progress-bar');
+        const progressText = document.getElementById('progressText');
+
+        // Handle drag and drop
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('active');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('active');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('active');
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+        });
+
+        // Handle file browse
+        uploadSection.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            handleFile(file);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            if (!file.type.startsWith('audio/')) {
+                alert('Please upload an audio file');
+                return;
+            }
+
+            // Show progress section
+            uploadSection.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+
+            // Simulate file upload and analysis
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 5;
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${progress}%`;
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(showResults, 500);
+                }
+            }, 200);
+        }
+
+        function showResults() {
+            progressSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+
+            // Simulate analysis results
+            document.getElementById('overallScore').textContent = '85%';
+            document.getElementById('clarityScore').style.width = '90%';
+            document.getElementById('noiseScore').style.width = '75%';
+
+            const analysisPoints = document.getElementById('analysisPoints');
+            analysisPoints.innerHTML = `
+                <li><i class="bi bi-check-circle-fill text-green-500 mr-2"></i>Excellent voice clarity throughout the call</li>
+                <li><i class="bi bi-exclamation-circle-fill text-yellow-500 mr-2"></i>Minor background noise detected at 2:15</li>
+                <li><i class="bi bi-check-circle-fill text-green-500 mr-2"></i>Good pace and articulation</li>
+                <li><i class="bi bi-info-circle-fill text-blue-500 mr-2"></i>Call duration: 5:30 minutes</li>
+            `;
+        }
+
+        function downloadReport() {
+            // Simulate report download
+            alert('Report download started...');
+        }
+
+        function resetAnalysis() {
+            // Reset the interface
+            uploadSection.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
+            fileInput.value = '';
+        }
+    </script>
+</body>
+
+</html>
